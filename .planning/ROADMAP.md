@@ -74,9 +74,14 @@ v1.1 hardens the dashboard into a production-grade tool: secrets are managed saf
 **Files modified:**
 - `components/project_card.py` — integrate live timer fragment into running cards
 - `components/workspace.py` — add conditional auto-refresh when any task is running
+- `assets/style.css` — add pulsing animation for running timer display
 
 **Files created:**
 - `components/live_timer.py` — `@st.fragment(run_every="1s")` component that computes and displays elapsed time
+
+**Plans:** 2 plans
+- [ ] 08-01-PLAN.md — Live timer fragment component + card integration + CSS
+- [ ] 08-02-PLAN.md — Workspace conditional auto-refresh + visual verification
 
 **Success Criteria:**
 1. A running task card shows an elapsed time counter that visibly ticks every second without freezing or blocking other UI interactions
