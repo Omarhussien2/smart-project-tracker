@@ -3,6 +3,7 @@ Workspace tab renderer.
 Renders the full workspace view: status bar, to-do card, project grid, and add form.
 """
 
+from datetime import timedelta
 from typing import Dict, List, Optional
 
 import pandas as pd
@@ -12,8 +13,17 @@ from auth.google_sheets import read_projects, upsert_project, force_flush
 from components.project_card import render_project_card
 from components.todo_card import render_todo_card
 from config import SHEET_COLUMNS, WORKSPACES, TaskStatus
-from logic.state_manager import init_form_state, is_form_open, toggle_form, rebuild_session_from_sheets
-from logic.time_tracker import calculate_net_duration, format_duration
+from logic.state_manager import (
+    init_form_state,
+    is_form_open,
+    toggle_form,
+    rebuild_session_from_sheets,
+)
+from logic.time_tracker import (
+    calculate_net_duration,
+    format_duration,
+    get_status_from_log,
+)
 
 
 def render_workspace(workspace_key: str, is_demo: bool = False) -> None:
@@ -47,6 +57,25 @@ def render_workspace(workspace_key: str, is_demo: bool = False) -> None:
             rebuild_session_from_sheets(projects_df)
     else:
         projects_df = pd.DataFrame(columns=SHEET_COLUMNS)
+
+    # ── Conditional Auto-Refresh (30s sync when tasks running) ────
+    if not is_demo:
+        has_running = False
+        if not projects_df.empty and "timestamps_log" in projects_df.columns:
+            for _, row in projects_df.iterrows():
+                log = row.get("timestamps_log", "")
+                if isinstance(log, str) and get_status_from_log(log) == "running":
+                    has_running = True
+                    break
+
+        _auto_interval = timedelta(seconds=30) if has_running else None
+
+        @st.fragment(run_every=_auto_interval)
+        def _auto_refresh():
+            if has_running:
+                st.rerun()
+
+        _auto_refresh()
 
     # ── Status Overview Bar ──────────────────────────────────
     _render_status_bar(projects_df, ws_config)
@@ -117,7 +146,11 @@ def _render_status_bar(projects_df: pd.DataFrame, ws_config) -> None:
         return
 
     # Count by status
-    status_counts = projects_df["status"].value_counts().to_dict() if "status" in projects_df.columns else {}
+    status_counts = (
+        projects_df["status"].value_counts().to_dict()
+        if "status" in projects_df.columns
+        else {}
+    )
     running = status_counts.get(TaskStatus.RUNNING, 0)
     paused = status_counts.get(TaskStatus.PAUSED, 0)
     completed = status_counts.get(TaskStatus.COMPLETED, 0)
@@ -199,7 +232,9 @@ def _render_add_form(workspace_key: str, ws_config, is_demo: bool) -> None:
 
         col_submit, col_cancel = st.columns([1, 1])
         with col_submit:
-            submitted = st.form_submit_button("✅ Create Project", use_container_width=True)
+            submitted = st.form_submit_button(
+                "✅ Create Project", use_container_width=True
+            )
         with col_cancel:
             cancelled = st.form_submit_button("❌ Cancel", use_container_width=True)
 
