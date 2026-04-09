@@ -111,6 +111,7 @@ APP_TITLE = "Smart Project Tracker"
 APP_ICON = "📊"
 SHEET_NAME = "Smart Project Tracker"  # Name of the Google Spreadsheet
 CACHE_TTL_SECONDS = 30  # Refresh data every 30 seconds
+DEBOUNCE_INTERVAL_SECONDS = 5  # Batch writes to Sheets every 5 seconds
 
 # ─── Credentials ──────────────────────────────────────────────────────────
 

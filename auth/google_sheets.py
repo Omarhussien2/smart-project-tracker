@@ -4,6 +4,7 @@ Handles authentication, reading/writing project data, and timestamp management.
 """
 
 import json
+import time
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
@@ -11,12 +12,63 @@ import gspread
 import pandas as pd
 
 from config import (
+    DEBOUNCE_INTERVAL_SECONDS,
     SHEET_COLUMNS,
     SHEET_NAME,
     WORKSPACES,
     TaskStatus,
     get_google_credentials,
 )
+
+
+# ─── Debounced Write Buffer ───────────────────────────────────────────────
+
+_write_buffer: dict = {}  # {(workspace_key, project_id, column): value}
+_last_flush: float = 0.0
+
+
+def debounced_write(workspace_key: str, project_id: str, column: str, value) -> None:
+    """Buffer a column write. Flushes automatically if interval elapsed."""
+    global _last_flush
+    _write_buffer[(workspace_key, project_id, column)] = value
+    now = time.time()
+    if now - _last_flush >= DEBOUNCE_INTERVAL_SECONDS:
+        flush_writes()
+
+
+def flush_writes() -> None:
+    """Flush all buffered writes to Google Sheets."""
+    global _write_buffer, _last_flush
+    if not _write_buffer:
+        return
+
+    # Group by (workspace_key, project_id)
+    grouped: dict = {}
+    for (ws_key, proj_id, col), val in _write_buffer.items():
+        key = (ws_key, proj_id)
+        if key not in grouped:
+            grouped[key] = {}
+        grouped[key][col] = val
+
+    for (ws_key, proj_id), cols in grouped.items():
+        client = get_client()
+        ws = _get_sheet(client, ws_key)
+        records = ws.get_all_records(expected_headers=SHEET_COLUMNS)
+        for idx, row in enumerate(records, start=2):
+            if row.get("project_id") == proj_id:
+                for col, val in cols.items():
+                    col_idx = SHEET_COLUMNS.index(col)
+                    col_letter = chr(ord("A") + col_idx)
+                    ws.update(f"{col_letter}{idx}", [val])
+                break
+
+    _write_buffer.clear()
+    _last_flush = time.time()
+
+
+def force_flush() -> None:
+    """Force flush regardless of interval. Called before critical reads."""
+    flush_writes()
 
 
 def get_client() -> gspread.Client:
