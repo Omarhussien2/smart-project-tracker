@@ -22,10 +22,10 @@ from logic.state_manager import (
     set_pause_reason,
     set_project_status,
 )
+from components.live_timer import render_live_timer
 from logic.time_tracker import (
     calculate_net_duration,
     create_event,
-    format_duration,
     get_status_from_log,
     now_utc_iso,
 )
@@ -104,13 +104,9 @@ def render_project_card(
         # ── Task Description ─────────────────────────────────────
         st.markdown(f"**{task_desc}**")
 
-        # ── Duration Display ─────────────────────────────────────
+        # ── Duration Display (Live Timer Fragment) ──────────────
         if net_minutes > 0 or current_status == TaskStatus.RUNNING:
-            duration_str = format_duration(net_minutes)
-            st.markdown(
-                f'<div class="duration-display">⏱ {duration_str}</div>',
-                unsafe_allow_html=True,
-            )
+            render_live_timer(timestamps_log_raw, current_status)
 
         # ── Pause Reason (show if paused and has reason) ─────────
         if current_status == TaskStatus.PAUSED and pause_reason_saved:
