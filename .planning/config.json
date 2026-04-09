@@ -1,0 +1,18 @@
+{
+  "project_name": "Smart Project Tracker",
+  "current_milestone": "v1.1",
+  "milestone_name": "Stability & Persistence",
+  "models": {
+    "researcher": "default",
+    "synthesizer": "default",
+    "roadmapper": "default",
+    "planner": "default",
+    "checker": "default"
+  },
+  "workflow": {
+    "research": true,
+    "plan_checker": true,
+    "commit_docs": false
+  },
+  "last_phase_number": 5
+}
