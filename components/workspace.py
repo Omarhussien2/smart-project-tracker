@@ -92,7 +92,9 @@ def render_workspace(workspace_key: str, is_demo: bool = False) -> None:
     with col_refresh:
         if not is_demo:
             if st.button("🔄 Refresh", key=f"refresh_{workspace_key}"):
-                st.cache_data.clear()
+                from auth.google_sheets import _clear_cache
+
+                _clear_cache()
                 st.rerun()
 
     # ── Add New Project Form ─────────────────────────────────
