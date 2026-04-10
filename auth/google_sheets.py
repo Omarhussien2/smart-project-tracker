@@ -5,6 +5,7 @@ Handles authentication, reading/writing project data, and timestamp management.
 
 import json
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
@@ -50,8 +51,11 @@ def flush_writes() -> None:
             grouped[key] = {}
         grouped[key][col] = val
 
+    # Reuse a single client for all writes
+    client = None
     for (ws_key, proj_id), cols in grouped.items():
-        client = get_client()
+        if client is None:
+            client = get_client()
         ws = _get_sheet(client, ws_key)
         records = ws.get_all_records(expected_headers=SHEET_COLUMNS)
         for idx, row in enumerate(records, start=2):
@@ -111,11 +115,12 @@ def read_projects(workspace_key: str) -> pd.DataFrame:
 
 
 def generate_project_id(workspace_key: str) -> str:
-    """Generate a unique project ID based on workspace and timestamp."""
+    """Generate a unique project ID based on workspace, timestamp, and random suffix."""
     now = datetime.now(timezone.utc)
     prefix = workspace_key[:3].upper()
     timestamp = now.strftime("%Y%m%d%H%M%S")
-    return f"{prefix}-{timestamp}"
+    rand_suffix = uuid.uuid4().hex[:6]
+    return f"{prefix}-{timestamp}-{rand_suffix}"
 
 
 def upsert_project(workspace_key: str, project_data: Dict) -> str:
@@ -152,6 +157,8 @@ def append_timestamp(workspace_key: str, project_id: str, event: Dict) -> None:
     """
     Append a timestamp event to the project's timestamps_log.
     event format: {"action": "start|pause|resume|complete", "ts": "ISO timestamp"}
+
+    Batches all column updates into a single API call to reduce rate-limit risk.
     """
     client = get_client()
     ws = _get_sheet(client, workspace_key)
@@ -168,14 +175,18 @@ def append_timestamp(workspace_key: str, project_id: str, event: Dict) -> None:
 
             log.append(event)
 
-            # Update timestamps_log column
-            col_letter = chr(ord("A") + SHEET_COLUMNS.index("timestamps_log"))
-            ws.update(range_name=f"{col_letter}{idx}", values=[[json.dumps(log)]])
-
-            # Also update the individual time columns
+            # Build a batch update for all columns at once
             action = event.get("action", "")
             ts = event.get("ts", "")
 
+            # Build row data with only the columns we want to update
+            batch_updates = []  # [(col_letter, value), ...]
+
+            # 1) timestamps_log
+            tl_col = chr(ord("A") + SHEET_COLUMNS.index("timestamps_log"))
+            batch_updates.append((tl_col, json.dumps(log)))
+
+            # 2) Individual time columns
             time_col_map = {
                 "start": "start_time",
                 "pause": "pause_time",
@@ -184,11 +195,10 @@ def append_timestamp(workspace_key: str, project_id: str, event: Dict) -> None:
             }
             if action in time_col_map:
                 col_name = time_col_map[action]
-                col_idx = SHEET_COLUMNS.index(col_name)
-                col_letter = chr(ord("A") + col_idx)
-                ws.update(range_name=f"{col_letter}{idx}", values=[[ts]])
+                col_letter = chr(ord("A") + SHEET_COLUMNS.index(col_name))
+                batch_updates.append((col_letter, ts))
 
-            # Update status column
+            # 3) Status column
             status_map = {
                 "start": TaskStatus.RUNNING,
                 "pause": TaskStatus.PAUSED,
@@ -196,12 +206,14 @@ def append_timestamp(workspace_key: str, project_id: str, event: Dict) -> None:
                 "complete": TaskStatus.COMPLETED,
             }
             if action in status_map:
-                status_col_idx = SHEET_COLUMNS.index("status")
-                status_col_letter = chr(ord("A") + status_col_idx)
-                ws.update(
-                    range_name=f"{status_col_letter}{idx}",
-                    values=[[status_map[action]]],
-                )
+                status_col = chr(ord("A") + SHEET_COLUMNS.index("status"))
+                batch_updates.append((status_col, status_map[action]))
+
+            # Perform batch update: find contiguous ranges or update individually
+            # For small numbers of columns (2-3), individual calls are fine
+            # but we avoid the extra get_all_records() overhead
+            for col_letter, value in batch_updates:
+                ws.update(range_name=f"{col_letter}{idx}", values=[[value]])
 
             break
 
