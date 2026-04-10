@@ -48,30 +48,7 @@ from config import has_google_credentials
 
 is_demo = not has_google_credentials()
 
-# Test connection ONCE per session (not on every rerun to avoid API calls)
-_sheets_error = None
-if not is_demo and "connection_ok" not in st.session_state:
-    from auth.google_sheets import test_connection
-
-    _ok, _msg = test_connection()
-    st.session_state.connection_ok = _ok
-    st.session_state.connection_msg = _msg
-
-if not is_demo:
-    if not st.session_state.get("connection_ok", False):
-        is_demo = True
-        _sheets_error = st.session_state.get("connection_msg", "Unknown error")
-
-if _sheets_error:
-    st.error(
-        f"🔴 **Google Sheets Connection Failed**\n\n{_sheets_error}\n\n"
-        "The app is running in **offline mode** until this is fixed."
-    )
-    if st.button("🔄 Retry Connection"):
-        del st.session_state.connection_ok
-        del st.session_state.connection_msg
-        st.rerun()
-elif is_demo:
+if is_demo:
     st.warning(
         "⚠️ **Demo Mode** — Google credentials not found. "
         "Google Sheets integration is disabled.\n\n"

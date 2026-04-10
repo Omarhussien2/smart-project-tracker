@@ -42,45 +42,37 @@ def get_client() -> gspread.Client:
     return gspread.service_account_from_dict(creds)
 
 
-@st.cache_resource
 def _get_spreadsheet() -> gspread.Spreadsheet:
-    """Open the spreadsheet. One metadata API call per server restart."""
+    """Open the spreadsheet. NOT cached — avoids caching 429 failures."""
     client = get_client()
-    try:
-        return client.open_by_key(SHEET_ID)
-    except gspread.exceptions.APIError as e:
-        raise SheetsConnectionError(
-            f"Cannot access spreadsheet (HTTP {e.code if hasattr(e, 'code') else '?'}): "
-            f"Make sure the sheet is shared with your service account and "
-            f"Google Sheets + Drive APIs are enabled."
-        ) from e
+    return client.open_by_key(SHEET_ID)
 
 
 def _get_sheet(workspace_key: str) -> gspread.Worksheet:
-    """Get a project worksheet. Uses cached spreadsheet — no metadata API call."""
+    """Get a project worksheet. Returns None on API errors instead of crashing."""
     ws_config = WORKSPACES[workspace_key]
-    spreadsheet = _get_spreadsheet()
     try:
+        spreadsheet = _get_spreadsheet()
         return spreadsheet.worksheet(ws_config.sheet_name)
     except gspread.exceptions.WorksheetNotFound:
         # First time — create the worksheet with headers
+        spreadsheet = _get_spreadsheet()
         ws = spreadsheet.add_worksheet(
             title=ws_config.sheet_name, rows=100, cols=len(SHEET_COLUMNS)
         )
         ws.update(range_name="A1", values=[SHEET_COLUMNS])
-        _get_spreadsheet.clear()  # Refresh cached metadata
         return ws
 
 
 def _get_todos_sheet() -> gspread.Worksheet:
-    """Get or create the todos worksheet."""
-    spreadsheet = _get_spreadsheet()
+    """Get or create the todos worksheet. Returns None on API errors."""
     try:
+        spreadsheet = _get_spreadsheet()
         return spreadsheet.worksheet("todos")
     except gspread.exceptions.WorksheetNotFound:
+        spreadsheet = _get_spreadsheet()
         ws = spreadsheet.add_worksheet(title="todos", rows=100, cols=len(TODO_COLUMNS))
         ws.update(range_name="A1", values=[TODO_COLUMNS])
-        _get_spreadsheet.clear()
         return ws
 
 
@@ -143,20 +135,19 @@ def test_connection() -> tuple[bool, str]:
 def read_projects(workspace_key: str) -> pd.DataFrame:
     """
     Read all projects from a workspace's sheet.
-    Cached for 30 seconds — only 1 API call per cache period instead of 3+.
+    Cached for 30 seconds. Returns empty DataFrame on API errors (never crashes).
     """
     try:
         ws = _get_sheet(workspace_key)
-    except SheetsConnectionError:
-        raise
-    except Exception as e:
-        raise SheetsConnectionError(f"Cannot open worksheet: {e}") from e
-
-    records = ws.get_all_records(expected_headers=SHEET_COLUMNS)
-    if not records:
+        if ws is None:
+            return pd.DataFrame(columns=SHEET_COLUMNS)
+        records = ws.get_all_records(expected_headers=SHEET_COLUMNS)
+        if not records:
+            return pd.DataFrame(columns=SHEET_COLUMNS)
+        return pd.DataFrame(records, columns=SHEET_COLUMNS)
+    except Exception:
+        # Never crash — return empty and let the UI show "no projects"
         return pd.DataFrame(columns=SHEET_COLUMNS)
-
-    return pd.DataFrame(records, columns=SHEET_COLUMNS)
 
 
 # ─── To-Do Column Definitions ────────────────────────────────────────────
@@ -166,16 +157,15 @@ TODO_COLUMNS = ["todo_id", "text", "checked", "workspace"]
 
 @st.cache_data(ttl=30, show_spinner=False)
 def read_todos(workspace_key: str) -> List[Dict]:
-    """Read todos for a workspace. Cached for 30 seconds."""
+    """Read todos for a workspace. Cached 30s. Returns empty list on errors."""
     try:
         ws = _get_todos_sheet()
-    except SheetsConnectionError:
-        raise
-    except Exception as e:
-        raise SheetsConnectionError(f"Cannot open todos sheet: {e}") from e
-
-    records = ws.get_all_records(expected_headers=TODO_COLUMNS)
-    return [r for r in records if r.get("workspace") == workspace_key]
+        if ws is None:
+            return []
+        records = ws.get_all_records(expected_headers=TODO_COLUMNS)
+        return [r for r in records if r.get("workspace") == workspace_key]
+    except Exception:
+        return []
 
 
 # ─── Write Functions ──────────────────────────────────────────────────────

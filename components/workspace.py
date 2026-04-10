@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 import streamlit as st
 
-from auth.google_sheets import read_projects, upsert_project, SheetsConnectionError
+from auth.google_sheets import read_projects, upsert_project
 from components.project_card import render_project_card
 from components.todo_card import render_todo_card
 from config import SHEET_COLUMNS, WORKSPACES, TaskStatus
@@ -50,17 +50,9 @@ def render_workspace(workspace_key: str, is_demo: bool = False) -> None:
 
     # ── Load Project Data ────────────────────────────────────
     if not is_demo:
-        try:
-            projects_df = read_projects(workspace_key)
-            # Rebuild session state from Sheets (source of truth)
-            if not projects_df.empty:
-                rebuild_session_from_sheets(projects_df)
-        except SheetsConnectionError as e:
-            st.error(f"🔴 **Sheets API error:** {e}")
-            projects_df = pd.DataFrame(columns=SHEET_COLUMNS)
-        except Exception as e:
-            st.error(f"⚠️ Failed to load projects: `{e}`")
-            projects_df = pd.DataFrame(columns=SHEET_COLUMNS)
+        projects_df = read_projects(workspace_key)
+        if not projects_df.empty:
+            rebuild_session_from_sheets(projects_df)
     else:
         projects_df = pd.DataFrame(columns=SHEET_COLUMNS)
 
