@@ -1,10 +1,7 @@
 # Google credentials — NEVER commit these
 credentials.json
-*.json
-!package.json
-
-# Service account keys
 smart-project-tracker*.json
+service-account*.json
 
 # Python
 __pycache__/

@@ -91,7 +91,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown(
         f"<div style='text-align:center; color:#6c757d; font-size:0.75rem;'>"
-        f"{APP_TITLE} v1.0<br/>"
+        f"{APP_TITLE} v1.1<br/>"
         f"Built with Streamlit + Google Sheets"
         f"</div>",
         unsafe_allow_html=True,
