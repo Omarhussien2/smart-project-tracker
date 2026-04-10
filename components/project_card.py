@@ -12,7 +12,6 @@ from auth.google_sheets import (
     append_timestamp,
     update_net_duration,
     update_pause_reason,
-    force_flush,
 )
 from config import SHEET_COLUMNS, WORKSPACES, TaskStatus
 from logic.state_manager import (
@@ -185,7 +184,6 @@ def _handle_action(
     if not is_demo:
         # Write to Google Sheets
         append_timestamp(workspace_key, project_id, event)
-        force_flush()  # Ensure write is persisted before any read
 
         # If completing, calculate and save net duration
         if action == "complete":

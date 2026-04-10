@@ -9,12 +9,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 import streamlit as st
 
-from auth.google_sheets import (
-    read_projects,
-    upsert_project,
-    force_flush,
-    SheetsConnectionError,
-)
+from auth.google_sheets import read_projects, upsert_project, SheetsConnectionError
 from components.project_card import render_project_card
 from components.todo_card import render_todo_card
 from config import SHEET_COLUMNS, WORKSPACES, TaskStatus
@@ -56,7 +51,6 @@ def render_workspace(workspace_key: str, is_demo: bool = False) -> None:
     # ── Load Project Data ────────────────────────────────────
     if not is_demo:
         try:
-            force_flush()  # Flush any pending writes before reading
             projects_df = read_projects(workspace_key)
             # Rebuild session state from Sheets (source of truth)
             if not projects_df.empty:
