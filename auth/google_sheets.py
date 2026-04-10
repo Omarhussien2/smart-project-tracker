@@ -14,7 +14,7 @@ import pandas as pd
 from config import (
     DEBOUNCE_INTERVAL_SECONDS,
     SHEET_COLUMNS,
-    SHEET_NAME,
+    SHEET_ID,
     WORKSPACES,
     TaskStatus,
     get_google_credentials,
@@ -82,7 +82,7 @@ def get_client() -> gspread.Client:
 def _get_sheet(client: gspread.Client, workspace_key: str) -> gspread.Worksheet:
     """Get the worksheet for a specific workspace."""
     ws_config = WORKSPACES[workspace_key]
-    spreadsheet = client.open(SHEET_NAME)
+    spreadsheet = client.open_by_key(SHEET_ID)
     return spreadsheet.worksheet(ws_config.sheet_name)
 
 
@@ -239,14 +239,12 @@ TODO_COLUMNS = ["todo_id", "text", "checked", "workspace"]
 def read_todos(workspace_key: str) -> List[Dict]:
     """Read all to-do items for a workspace from the 'todos' sheet."""
     client = get_client()
-    spreadsheet = client.open(SHEET_NAME)
+    spreadsheet = client.open_by_key(SHEET_ID)
 
     try:
         ws = spreadsheet.worksheet("todos")
     except gspread.WorksheetNotFound:
-        ws = spreadsheet.add_worksheet(
-            title="todos", rows=100, cols=len(TODO_COLUMNS)
-        )
+        ws = spreadsheet.add_worksheet(title="todos", rows=100, cols=len(TODO_COLUMNS))
         ws.update("A1", [TODO_COLUMNS])
 
     records = ws.get_all_records(expected_headers=TODO_COLUMNS)
@@ -259,14 +257,12 @@ def add_todo(workspace_key: str, text: str) -> str:
 
     todo_id = f"todo-{uuid.uuid4().hex[:8]}"
     client = get_client()
-    spreadsheet = client.open(SHEET_NAME)
+    spreadsheet = client.open_by_key(SHEET_ID)
 
     try:
         ws = spreadsheet.worksheet("todos")
     except gspread.WorksheetNotFound:
-        ws = spreadsheet.add_worksheet(
-            title="todos", rows=100, cols=len(TODO_COLUMNS)
-        )
+        ws = spreadsheet.add_worksheet(title="todos", rows=100, cols=len(TODO_COLUMNS))
         ws.update("A1", [TODO_COLUMNS])
 
     ws.append_row([todo_id, text, False, workspace_key])
@@ -276,7 +272,7 @@ def add_todo(workspace_key: str, text: str) -> str:
 def toggle_todo(workspace_key: str, todo_id: str, checked: bool) -> None:
     """Toggle the checked state of a to-do item."""
     client = get_client()
-    spreadsheet = client.open(SHEET_NAME)
+    spreadsheet = client.open_by_key(SHEET_ID)
     ws = spreadsheet.worksheet("todos")
 
     records = ws.get_all_records(expected_headers=TODO_COLUMNS)
@@ -291,7 +287,7 @@ def toggle_todo(workspace_key: str, todo_id: str, checked: bool) -> None:
 def delete_todo(workspace_key: str, todo_id: str) -> None:
     """Delete a to-do item."""
     client = get_client()
-    spreadsheet = client.open(SHEET_NAME)
+    spreadsheet = client.open_by_key(SHEET_ID)
     ws = spreadsheet.worksheet("todos")
 
     records = ws.get_all_records(expected_headers=TODO_COLUMNS)

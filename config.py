@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 @dataclass(frozen=True)
 class WorkspaceConfig:
     """Immutable configuration for a single workspace."""
+
     name: str
     sheet_name: str
     icon: str
@@ -67,6 +68,7 @@ WORKSPACES: Dict[str, WorkspaceConfig] = {
 
 # ─── Status Definitions ───────────────────────────────────────────────────
 
+
 class TaskStatus:
     IDLE = "idle"
     RUNNING = "running"
@@ -81,11 +83,33 @@ class TaskStatus:
     def button_visibility(cls, status: str) -> Dict[str, bool]:
         """Returns which action buttons should be visible for a given status."""
         return {
-            TaskStatus.IDLE:       {"start": True,  "pause": False, "resume": False, "complete": False},
-            TaskStatus.RUNNING:    {"start": False, "pause": True,  "resume": False, "complete": True},
-            TaskStatus.PAUSED:     {"start": False, "pause": False, "resume": True,  "complete": True},
-            TaskStatus.COMPLETED:  {"start": False, "pause": False, "resume": False, "complete": False},
-        }.get(status, {"start": True, "pause": False, "resume": False, "complete": False})
+            TaskStatus.IDLE: {
+                "start": True,
+                "pause": False,
+                "resume": False,
+                "complete": False,
+            },
+            TaskStatus.RUNNING: {
+                "start": False,
+                "pause": True,
+                "resume": False,
+                "complete": True,
+            },
+            TaskStatus.PAUSED: {
+                "start": False,
+                "pause": False,
+                "resume": True,
+                "complete": True,
+            },
+            TaskStatus.COMPLETED: {
+                "start": False,
+                "pause": False,
+                "resume": False,
+                "complete": False,
+            },
+        }.get(
+            status, {"start": True, "pause": False, "resume": False, "complete": False}
+        )
 
 
 # ─── Google Sheets Column Mapping ─────────────────────────────────────────
@@ -109,7 +133,9 @@ SHEET_COLUMNS = [
 
 APP_TITLE = "Smart Project Tracker"
 APP_ICON = "📊"
-SHEET_NAME = "Smart Project Tracker"  # Name of the Google Spreadsheet
+SHEET_ID = (
+    "1dSQNms17vFlpBseVe67h3N3xTIDz8ML8RjUSaNcf_vg"  # Google Spreadsheet ID (from URL)
+)
 CACHE_TTL_SECONDS = 30  # Refresh data every 30 seconds
 DEBOUNCE_INTERVAL_SECONDS = 5  # Batch writes to Sheets every 5 seconds
 
