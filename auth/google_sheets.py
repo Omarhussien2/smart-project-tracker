@@ -59,7 +59,7 @@ def flush_writes() -> None:
                 for col, val in cols.items():
                     col_idx = SHEET_COLUMNS.index(col)
                     col_letter = chr(ord("A") + col_idx)
-                    ws.update(f"{col_letter}{idx}", [val])
+                    ws.update(range_name=f"{col_letter}{idx}", values=[[val]])
                 break
 
     _write_buffer.clear()
@@ -90,7 +90,7 @@ def _ensure_headers(ws: gspread.Worksheet) -> None:
     """Ensure the worksheet has the correct header row."""
     existing = ws.row_values(1)
     if existing != SHEET_COLUMNS:
-        ws.update("A1", [SHEET_COLUMNS])
+        ws.update(range_name="A1", values=[SHEET_COLUMNS])
 
 
 def read_projects(workspace_key: str) -> pd.DataFrame:
@@ -135,7 +135,7 @@ def upsert_project(workspace_key: str, project_data: Dict) -> str:
         for idx, row in enumerate(records, start=2):  # row 1 is header
             if row.get("project_id") == project_id:
                 row_data = [project_data.get(col, "") for col in SHEET_COLUMNS]
-                ws.update(f"A{idx}", [row_data])
+                ws.update(range_name=f"A{idx}", values=[row_data])
                 return project_id
 
     # Insert new project
@@ -168,9 +168,9 @@ def append_timestamp(workspace_key: str, project_id: str, event: Dict) -> None:
 
             log.append(event)
 
-            # Update timestamps_log column (column index 12 = L)
+            # Update timestamps_log column
             col_letter = chr(ord("A") + SHEET_COLUMNS.index("timestamps_log"))
-            ws.update(f"{col_letter}{idx}", [json.dumps(log)])
+            ws.update(range_name=f"{col_letter}{idx}", values=[[json.dumps(log)]])
 
             # Also update the individual time columns
             action = event.get("action", "")
@@ -186,7 +186,7 @@ def append_timestamp(workspace_key: str, project_id: str, event: Dict) -> None:
                 col_name = time_col_map[action]
                 col_idx = SHEET_COLUMNS.index(col_name)
                 col_letter = chr(ord("A") + col_idx)
-                ws.update(f"{col_letter}{idx}", [ts])
+                ws.update(range_name=f"{col_letter}{idx}", values=[[ts]])
 
             # Update status column
             status_map = {
@@ -198,7 +198,10 @@ def append_timestamp(workspace_key: str, project_id: str, event: Dict) -> None:
             if action in status_map:
                 status_col_idx = SHEET_COLUMNS.index("status")
                 status_col_letter = chr(ord("A") + status_col_idx)
-                ws.update(f"{status_col_letter}{idx}", [status_map[action]])
+                ws.update(
+                    range_name=f"{status_col_letter}{idx}",
+                    values=[[status_map[action]]],
+                )
 
             break
 
@@ -213,7 +216,7 @@ def update_net_duration(workspace_key: str, project_id: str, minutes: float) -> 
         if row.get("project_id") == project_id:
             col_idx = SHEET_COLUMNS.index("net_duration_minutes")
             col_letter = chr(ord("A") + col_idx)
-            ws.update(f"{col_letter}{idx}", [round(minutes, 2)])
+            ws.update(range_name=f"{col_letter}{idx}", values=[[round(minutes, 2)]])
             break
 
 
@@ -227,7 +230,7 @@ def update_pause_reason(workspace_key: str, project_id: str, reason: str) -> Non
         if row.get("project_id") == project_id:
             col_idx = SHEET_COLUMNS.index("pause_reason")
             col_letter = chr(ord("A") + col_idx)
-            ws.update(f"{col_letter}{idx}", [reason])
+            ws.update(range_name=f"{col_letter}{idx}", values=[[reason]])
             break
 
 
@@ -245,7 +248,7 @@ def read_todos(workspace_key: str) -> List[Dict]:
         ws = spreadsheet.worksheet("todos")
     except gspread.WorksheetNotFound:
         ws = spreadsheet.add_worksheet(title="todos", rows=100, cols=len(TODO_COLUMNS))
-        ws.update("A1", [TODO_COLUMNS])
+        ws.update(range_name="A1", values=[TODO_COLUMNS])
 
     records = ws.get_all_records(expected_headers=TODO_COLUMNS)
     return [r for r in records if r.get("workspace") == workspace_key]
@@ -263,7 +266,7 @@ def add_todo(workspace_key: str, text: str) -> str:
         ws = spreadsheet.worksheet("todos")
     except gspread.WorksheetNotFound:
         ws = spreadsheet.add_worksheet(title="todos", rows=100, cols=len(TODO_COLUMNS))
-        ws.update("A1", [TODO_COLUMNS])
+        ws.update(range_name="A1", values=[TODO_COLUMNS])
 
     ws.append_row([todo_id, text, False, workspace_key])
     return todo_id
@@ -280,7 +283,7 @@ def toggle_todo(workspace_key: str, todo_id: str, checked: bool) -> None:
         if row.get("todo_id") == todo_id:
             col_idx = TODO_COLUMNS.index("checked")
             col_letter = chr(ord("A") + col_idx)
-            ws.update(f"{col_letter}{idx}", [checked])
+            ws.update(range_name=f"{col_letter}{idx}", values=[[checked]])
             break
 
 
