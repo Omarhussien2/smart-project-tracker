@@ -1,0 +1,35 @@
+# Version control
+.git
+.gitignore
+
+# GSD planning (internal development)
+.planning
+PLAN.md
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+.ruff_cache
+
+# Secrets — NEVER include in Docker image
+.streamlit/secrets.toml
+.streamlit/secrets.toml.bak
+credentials.json
+
+# Deployment configs (mounted separately)
+deploy/
+
+# Documentation
+README_DEPLOY.md
+
+# Tools
+claude.exe
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
