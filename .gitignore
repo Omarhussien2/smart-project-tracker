@@ -1,0 +1,43 @@
+# Google credentials — NEVER commit these
+credentials.json
+*.json
+!package.json
+
+# Service account keys
+smart-project-tracker*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.ruff_cache/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Streamlit secrets — contains private keys
+.streamlit/secrets.toml
+.streamlit/secrets.toml.bak
+
+# GSD planning (internal development)
+.planning/
+PLAN.md
+
+# Tools
+claude.exe
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
