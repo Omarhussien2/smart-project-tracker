@@ -44,13 +44,26 @@ st.markdown(
 
 # ─── Check for credentials ───────────────────────────────────────────────
 
-try:
-    _test = st.secrets["google_credentials"]
-    is_demo = False
-except Exception:
-    is_demo = True
+from config import has_google_credentials
 
-if is_demo:
+is_demo = not has_google_credentials()
+
+# If credentials exist, verify they actually work
+_sheets_error = None
+if not is_demo:
+    from auth.google_sheets import test_connection
+
+    _ok, _msg = test_connection()
+    if not _ok:
+        is_demo = True
+        _sheets_error = _msg
+
+if _sheets_error:
+    st.error(
+        f"🔴 **Google Sheets Connection Failed**\n\n{_msg}\n\n"
+        "The app is running in **offline mode** until this is fixed."
+    )
+elif is_demo:
     st.warning(
         "⚠️ **Demo Mode** — Google credentials not found. "
         "Google Sheets integration is disabled.\n\n"

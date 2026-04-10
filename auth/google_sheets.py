@@ -83,10 +83,107 @@ def get_client() -> gspread.Client:
     return gspread.service_account_from_dict(creds)
 
 
+def test_connection() -> tuple[bool, str]:
+    """
+    Test the Google Sheets connection and return a diagnostic result.
+    Returns (success: bool, message: str) with actionable advice on failure.
+    """
+    try:
+        creds = get_google_credentials()
+    except Exception as e:
+        return False, f"❌ Failed to read credentials: `{e}`"
+
+    if creds is None:
+        return False, (
+            "❌ No Google credentials found in `st.secrets['google_credentials']`.\n\n"
+            "**Fix:** Add your service account JSON to `.streamlit/secrets.toml`."
+        )
+
+    # Validate credential structure
+    client_email = creds.get("client_email", "UNKNOWN")
+    if creds.get("type") != "service_account":
+        return (
+            False,
+            f"❌ Credentials are not a service account (type={creds.get('type')}).",
+        )
+
+    if not creds.get("private_key"):
+        return False, "❌ Credentials missing `private_key` field."
+
+    # Try to connect and access the spreadsheet
+    try:
+        client = gspread.service_account_from_dict(creds)
+    except Exception as e:
+        return False, f"❌ Failed to authenticate with Google: `{e}`"
+
+    try:
+        spreadsheet = client.open_by_key(SHEET_ID)
+        # Try to read sheet names to confirm access
+        _ = spreadsheet.title
+    except gspread.exceptions.APIError as e:
+        code = e.code if hasattr(e, "code") else "?"
+        msg = str(e) if hasattr(e, "message") else repr(e)
+        return False, (
+            f"❌ **Google Sheets API error** (HTTP {code}): {msg}\n\n"
+            f"**Service account:** `{client_email}`\n"
+            f"**Sheet ID:** `{SHEET_ID}`\n\n"
+            f"**Most likely causes:**\n"
+            f"1. 🔑 **Share the spreadsheet** with `{client_email}` — "
+            f"open the Google Sheet → Share → add that email as **Editor**\n"
+            f"2. 🛠️ **Enable Google Sheets API** — go to "
+            f"[Google Cloud Console](https://console.cloud.google.com/apis/library/sheets.googleapis.com"
+            f"?project=smart-project-tracker-492914) and enable it\n"
+            f"3. 🛠️ **Enable Google Drive API** — go to "
+            f"[Google Cloud Console](https://console.cloud.google.com/apis/library/drive.googleapis.com"
+            f"?project=smart-project-tracker-492914) and enable it"
+        )
+    except gspread.exceptions.SpreadsheetNotFound:
+        return False, (
+            f"❌ Spreadsheet not found (ID: `{SHEET_ID}`).\n\n"
+            f"**Fix:** Verify the SHEET_ID in `config.py` matches your Google Sheet URL."
+        )
+    except Exception as e:
+        return False, f"❌ Unexpected error accessing spreadsheet: `{e}`"
+
+    # Verify worksheets exist
+    ws_names = [ws_config.sheet_name for ws_config in WORKSPACES.values()]
+    try:
+        existing_titles = [ws.title for ws in spreadsheet.worksheets()]
+    except Exception as e:
+        return False, f"❌ Cannot list worksheets: `{e}`"
+
+    missing = [name for name in ws_names if name not in existing_titles]
+    if missing:
+        return True, (
+            f"⚠️ Connected to spreadsheet **'{spreadsheet.title}'**, "
+            f"but worksheets {missing} don't exist yet.\n"
+            f"They will be created automatically when you add the first project."
+        )
+
+    return (
+        True,
+        f"✅ Connected to spreadsheet **'{spreadsheet.title}'** ({len(existing_titles)} worksheets).",
+    )
+
+
+class SheetsConnectionError(Exception):
+    """Raised when Google Sheets API is unreachable or returns an auth error."""
+
+    pass
+
+
 def _get_sheet(client: gspread.Client, workspace_key: str) -> gspread.Worksheet:
     """Get the worksheet for a specific workspace."""
     ws_config = WORKSPACES[workspace_key]
-    spreadsheet = client.open_by_key(SHEET_ID)
+    try:
+        spreadsheet = client.open_by_key(SHEET_ID)
+    except gspread.exceptions.APIError as e:
+        raise SheetsConnectionError(
+            f"Google Sheets API error (HTTP {e.code if hasattr(e, 'code') else '?'}): "
+            f"The service account cannot access the spreadsheet. "
+            f"Make sure the sheet is shared with your service account email "
+            f"and the Google Sheets API is enabled."
+        ) from e
     return spreadsheet.worksheet(ws_config.sheet_name)
 
 
@@ -101,6 +198,7 @@ def read_projects(workspace_key: str) -> pd.DataFrame:
     """
     Read all projects from a workspace's Google Sheet.
     Returns a DataFrame with SHEET_COLUMNS as columns.
+    Raises SheetsConnectionError if the API call fails.
     """
     client = get_client()
     ws = _get_sheet(client, workspace_key)
