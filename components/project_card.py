@@ -71,7 +71,9 @@ def render_project_card(
     # Card container with status-based border
     border_class = f"card-{current_status}"
     with st.container():
-        st.markdown(f'<div class="project-card {border_class}">', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="project-card {border_class}">', unsafe_allow_html=True
+        )
 
         # ── Card Header: Category badge + Status badge ──────────
         ws_config = WORKSPACES[workspace_key]
@@ -133,34 +135,26 @@ def render_project_card(
             if visibility.get("start"):
                 with btn_cols[button_idx]:
                     if st.button("▶ Start", key=f"start_{project_id}", type="primary"):
-                        _handle_action(
-                            workspace_key, project_id, "start", is_demo
-                        )
+                        _handle_action(workspace_key, project_id, "start", is_demo)
                 button_idx += 1
 
             if visibility.get("pause"):
                 # Show pause reason input inline
                 with btn_cols[button_idx]:
                     if st.button("⏸ Pause", key=f"pause_{project_id}"):
-                        _handle_action(
-                            workspace_key, project_id, "pause", is_demo
-                        )
+                        _handle_action(workspace_key, project_id, "pause", is_demo)
                 button_idx += 1
 
             if visibility.get("resume"):
                 with btn_cols[button_idx]:
                     if st.button("▶ Resume", key=f"resume_{project_id}"):
-                        _handle_action(
-                            workspace_key, project_id, "resume", is_demo
-                        )
+                        _handle_action(workspace_key, project_id, "resume", is_demo)
                 button_idx += 1
 
             if visibility.get("complete"):
                 with btn_cols[button_idx]:
                     if st.button("✓ Complete", key=f"complete_{project_id}"):
-                        _handle_action(
-                            workspace_key, project_id, "complete", is_demo
-                        )
+                        _handle_action(workspace_key, project_id, "complete", is_demo)
                 button_idx += 1
 
             st.markdown("</div>", unsafe_allow_html=True)
@@ -197,15 +191,15 @@ def _handle_action(
         if action == "complete":
             from auth.google_sheets import read_projects
 
-            # Read back the updated log to calculate duration
-            import time
-            time.sleep(0.5)  # Brief delay for sheet propagation
-            df = read_projects(workspace_key)
-            row = df[df["project_id"] == project_id]
-            if not row.empty:
-                log_str = row.iloc[0].get("timestamps_log", "")
-                net = calculate_net_duration(log_str)
-                update_net_duration(workspace_key, project_id, net)
+            # Retry read to ensure sheet propagation
+            for _attempt in range(3):
+                df = read_projects(workspace_key)
+                row = df[df["project_id"] == project_id]
+                if not row.empty:
+                    log_str = row.iloc[0].get("timestamps_log", "")
+                    net = calculate_net_duration(log_str)
+                    update_net_duration(workspace_key, project_id, net)
+                    break
 
         # If pausing, save the pause reason
         if action == "pause":
