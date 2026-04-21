@@ -50,9 +50,13 @@ def render_workspace(workspace_key: str, is_demo: bool = False) -> None:
 
     # ── Load Project Data ────────────────────────────────────
     if not is_demo:
-        projects_df = read_projects(workspace_key)
-        if not projects_df.empty:
-            rebuild_session_from_sheets(projects_df)
+        try:
+            projects_df = read_projects(workspace_key)
+            if not projects_df.empty:
+                rebuild_session_from_sheets(projects_df)
+        except Exception as e:
+            st.error(f"⚠️ Could not load projects: `{e}`")
+            projects_df = pd.DataFrame(columns=SHEET_COLUMNS)
     else:
         projects_df = pd.DataFrame(columns=SHEET_COLUMNS)
 

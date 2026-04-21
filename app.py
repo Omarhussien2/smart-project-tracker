@@ -7,16 +7,15 @@ Google Sheets as live backend.
 """
 
 import os
-import streamlit as st
+import traceback
 
-from components.workspace import render_workspace
-from config import APP_ICON, APP_TITLE, WORKSPACES
+import streamlit as st
 
 # ─── Page Configuration ──────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title=APP_TITLE,
-    page_icon=APP_ICON,
+    page_title="Smart Project Tracker",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -31,9 +30,9 @@ if os.path.exists(css_path):
 # ─── App Title ───────────────────────────────────────────────────────────
 
 st.markdown(
-    f"""
+    """
     <div style="text-align:center; padding: 10px 0 20px 0;">
-        <h1>{APP_ICON} {APP_TITLE}</h1>
+        <h1>📊 Smart Project Tracker</h1>
         <p style="color:#6c757d; font-size:0.9rem;">
             Track your projects with smart time tracking • Live sync with Google Sheets
         </p>
@@ -42,19 +41,29 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ─── Check for credentials ───────────────────────────────────────────────
+# ─── Safe Import Zone ────────────────────────────────────────────────────
+# Everything below is wrapped in try/except so the page ALWAYS renders.
 
-from config import has_google_credentials
+_init_error = None
 
-is_demo = not has_google_credentials()
+try:
+    from config import APP_TITLE, WORKSPACES, has_google_credentials
 
-if is_demo:
-    st.warning(
-        "⚠️ **Demo Mode** — Google credentials not found. "
-        "Google Sheets integration is disabled.\n\n"
-        "**To enable:** Create `.streamlit/secrets.toml` with your Google Service Account credentials. "
-        "See the template in `.streamlit/secrets.toml` for the required format."
-    )
+    is_demo = not has_google_credentials()
+
+    if is_demo:
+        st.warning(
+            "⚠️ **Demo Mode** — Google credentials not found. "
+            "Google Sheets integration is disabled.\n\n"
+            "**To enable:** Add your Google Service Account credentials to "
+            "Streamlit Cloud secrets or `.streamlit/secrets.toml`."
+        )
+
+    from components.workspace import render_workspace
+
+except Exception as e:
+    _init_error = f"Init error: `{e}`\n\n```\n{traceback.format_exc()}\n```"
+    is_demo = True
 
 # ─── Dark/Light Mode Toggle ──────────────────────────────────────────────
 
@@ -88,12 +97,19 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown(
-        f"<div style='text-align:center; color:#6c757d; font-size:0.75rem;'>"
-        f"{APP_TITLE} v1.1<br/>"
-        f"Built with Streamlit + Google Sheets"
-        f"</div>",
+        "<div style='text-align:center; color:#6c757d; font-size:0.75rem;'>"
+        "Smart Project Tracker v1.1<br/>"
+        "Built with Streamlit + Google Sheets"
+        "</div>",
         unsafe_allow_html=True,
     )
+
+# ─── Show init error if imports failed ───────────────────────────────────
+
+if _init_error:
+    st.error(f"🔴 **Failed to initialize:**\n\n{_init_error}")
+    st.info("Check the Streamlit Cloud logs for details.")
+    st.stop()
 
 # ─── Workspace Tabs ──────────────────────────────────────────────────────
 
@@ -105,10 +121,16 @@ tab_labels = [
 tab_samawah, tab_kinder = st.tabs(tab_labels)
 
 with tab_samawah:
-    render_workspace("samawah", is_demo=is_demo)
+    try:
+        render_workspace("samawah", is_demo=is_demo)
+    except Exception as e:
+        st.error(f"🔴 Error loading Samawah: `{e}`")
 
 with tab_kinder:
-    render_workspace("kinder", is_demo=is_demo)
+    try:
+        render_workspace("kinder", is_demo=is_demo)
+    except Exception as e:
+        st.error(f"🔴 Error loading Kinder Market: `{e}`")
 
 # ─── Footer ──────────────────────────────────────────────────────────────
 
